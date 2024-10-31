@@ -4,10 +4,11 @@
 import json
 from os import environ as env
 from urllib.parse import quote_plus, urlencode
+from auth0_utils import update_user_metadata  # Importa la función desde auth0_utils
 
 from authlib.integrations.flask_client import OAuth
 from dotenv import find_dotenv, load_dotenv
-from flask import Flask, redirect, render_template, session, url_for
+from flask import Flask, redirect, render_template, session, url_for, request
 
 ENV_FILE = find_dotenv()
 if ENV_FILE:
@@ -15,7 +16,6 @@ if ENV_FILE:
 
 app = Flask(__name__)
 app.secret_key = env.get("APP_SECRET_KEY")
-
 
 oauth = OAuth(app)
 
@@ -71,5 +71,26 @@ def logout():
     )
 
 
+# Nuevo endpoint para manejar el formulario y actualizar user_metadata
+@app.route("/submit_form", methods=["POST"])
+def submit_form():
+    user_id = session["user"]["userinfo"]["sub"]  # Obtener el ID del usuario en Auth0
+    data = {
+        "tipoDocumento": request.form["tipoDocumento"],
+        "numeroDocumento": request.form["numeroDocumento"],
+        "direccion": request.form["direccion"],
+        "telefono": request.form["telefono"]
+    }
+
+    try:
+        response = update_user_metadata(user_id, data)
+        if response.get("error"):
+            raise Exception(response["error"])
+        return redirect(url_for("home"))  # Redirige a la página principal o perfil
+    except Exception as e:
+        print(f"Error al actualizar user_metadata: {e}")  # Muestra el error en la consola
+        return f"Error actualizando datos: {e}", 500  # Muestra el error en la respuesta HTTP
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=env.get("PORT", 3000))
+    app.run(host="0.0.0.0", port=env.get("PORT", 3000), debug=True)
